@@ -213,6 +213,50 @@
 </dialog>
 
 
+<!-- =====================================
+     PHASE 2C - ACHIEVEMENTS AND REWARDS
+     ===================================== -->
+
+<section class="panel achievements-section">
+
+  <div class="achievements-heading">
+    <div>
+      <h2>🏆 Achievements & Rewards</h2>
+      <p>
+        Complete challenges and claim bonus coins!
+      </p>
+    </div>
+
+    <div class="achievement-summary">
+      <strong id="achievementCount">
+        0 / 9 Unlocked
+      </strong>
+
+      <span id="achievementReady">
+        No rewards waiting
+      </span>
+    </div>
+  </div>
+
+  <!-- JavaScript generates all nine achievements. -->
+  <div
+    id="achievementsList"
+    class="achievement-grid"
+  ></div>
+
+</section>
+
+<!-- Notification shown when an achievement unlocks. -->
+<div
+  id="achievementToast"
+  class="achievement-toast"
+  role="status"
+  aria-live="polite"
+  hidden
+></div>
+
+
+
     <footer>
       <p>Monster Hatchery • Made with HTML, CSS and JavaScript</p>
     </footer>
