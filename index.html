@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <!-- Makes the game fit mobile and desktop screens. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Monster Hatchery</title>
+
+  <!-- Loads the game's styling. -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- defer loads JavaScript after the HTML is ready. -->
+  <script src="script.js" defer></script>
+</head>
+
+<body>
+  <main class="container">
+
+    <!-- Game title and player statistics. -->
+    <header class="header">
+      <div>
+        <p class="eyebrow">A MINI COLLECTION GAME</p>
+        <h1>🥚 Monster Hatchery</h1>
+        <p>Hatch eggs. Discover creatures. Collect them all!</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <span>🪙 Coins</span>
+          <strong id="coins">200</strong>
+        </div>
+
+        <div class="stat">
+          <span>📖 Discovered</span>
+          <strong id="discovered">0 / 13</strong>
+        </div>
+
+        <div class="stat">
+          <span>🥚 Eggs Hatched</span>
+          <strong id="hatches">0</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="game-layout">
+
+      <!-- Main egg hatching area. -->
+      <div class="panel hatchery">
+        <h2>✨ Hatching Station</h2>
+        <p>Choose an egg and see what creature appears.</p>
+
+        <div id="egg" class="egg" aria-hidden="true">🥚</div>
+
+        <!-- JavaScript updates this message. -->
+        <p id="status" class="status" role="status" aria-live="polite">
+          Your adventure starts here!
+        </p>
+
+        <div class="egg-options">
+          <button id="meadowBtn" class="egg-button">
+            <span>🌿 Meadow Egg</span>
+            <strong>40 Coins</strong>
+          </button>
+
+          <button id="moonBtn" class="egg-button premium">
+            <span>🌙 Moon Egg</span>
+            <strong>100 Coins</strong>
+          </button>
+        </div>
+
+        <p class="hint">
+          Moon Eggs have better chances of rare creatures!
+        </p>
+
+        <div class="coin-section">
+          <button id="claimBtn" class="claim-button">
+            🪙 Gather 25 Coins
+          </button>
+
+          <p id="claimHint" class="hint">
+            Gather free coins every 12 seconds.
+          </p>
+        </div>
+      </div>
+
+      <!-- Displays the newest discovered monster. -->
+      <aside class="panel result-panel">
+        <h2>🎉 Latest Hatch</h2>
+
+        <div id="result" class="result">
+          <p>Your next monster will appear here.</p>
+        </div>
+
+        <div class="rarity-guide">
+          <h3>Rarity Levels</h3>
+          <p>⚪ Common</p>
+          <p>🔵 Rare</p>
+          <p>🟣 Epic</p>
+          <p>🟡 Legendary</p>
+          <p>🔴 Mythic</p>
+        </div>
+      </aside>
+
+    </section>
+
+    <!-- Monster collection / encyclopedia. -->
+    <section class="panel encyclopedia">
+      <div class="collection-header">
+        <div>
+          <h2>📖 Monster Encyclopedia</h2>
+          <p>Discover all 13 creatures to complete your collection.</p>
+        </div>
+
+        <button id="resetBtn" class="reset-button">
+          Reset Progress
+        </button>
+      </div>
+
+      <!-- JavaScript creates the monster cards here. -->
+      <div id="collection" class="monster-grid"></div>
+    </section>
+
+    <footer>
+      <p>Monster Hatchery • Made with HTML, CSS and JavaScript</p>
+    </footer>
+
+  </main>
+</body>
+</html>
