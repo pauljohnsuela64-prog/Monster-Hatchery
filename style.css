@@ -645,3 +645,224 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+
+
+/* ======================================
+   PHASE 2C - ACHIEVEMENT SYSTEM
+   ====================================== */
+
+.achievements-section {
+  margin-top: 20px;
+}
+
+.achievements-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.achievements-heading p {
+  color: var(--muted);
+}
+
+.achievement-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: right;
+}
+
+.achievement-summary strong {
+  color: #fcd34d;
+}
+
+.achievement-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Responsive grid for the nine achievement cards. */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, 260px), 1fr)
+  );
+  gap: 15px;
+}
+
+/* Base appearance of each achievement card. */
+.achievement-card {
+  background: #242844;
+  border: 1px solid #4b5075;
+  border-radius: 16px;
+  padding: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Completed achievements have a golden border. */
+.achievement-card.unlocked {
+  border-color: #eab308;
+  background: #302c40;
+}
+
+/* Claimed achievements have a green border. */
+.achievement-card.claimed {
+  border-color: #22c55e;
+}
+
+.achievement-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.achievement-icon {
+  font-size: 36px;
+  line-height: 1.2;
+}
+
+.achievement-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievement-info h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.achievement-info p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.achievement-status {
+  font-size: 12px;
+  font-weight: bold;
+  color: #cbd5e1;
+}
+
+.achievement-card.unlocked .achievement-status {
+  color: #fcd34d;
+}
+
+.achievement-card.claimed .achievement-status {
+  color: #86efac;
+}
+
+/* Native progress bar with a percentage-like fill. */
+.achievement-progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #eab308;
+}
+
+.achievement-progress-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.achievement-reward {
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fcd34d;
+}
+
+/* Button to claim achievement rewards. */
+.achievement-claim {
+  width: 100%;
+  min-height: 44px;
+
+  border: 1px solid #facc15;
+  border-radius: 10px;
+  background: #ca8a04;
+  color: #171717;
+
+  font-weight: bold;
+}
+
+.achievement-claim:hover:not(:disabled) {
+  background: #facc15;
+}
+
+.achievement-claim:disabled {
+  background: #383b56;
+  border-color: #525775;
+  color: #a9acc4;
+  cursor: not-allowed;
+}
+
+.achievement-card.claimed .achievement-claim {
+  background: #14532d;
+  border-color: #22c55e;
+  color: #bbf7d0;
+}
+
+/* Floating achievement notification. */
+.achievement-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+
+  width: min(420px, calc(100% - 32px));
+  padding: 16px 22px;
+
+  border: 1px solid #facc15;
+  border-radius: 14px;
+  background: #29223d;
+  color: #fef08a;
+
+  font-size: 15px;
+  font-weight: bold;
+  text-align: center;
+
+  box-shadow: 0 12px 35px #0008;
+  z-index: 1000;
+
+  animation: achievement-appear 0.3s ease-out;
+}
+
+/* Ensure the notification disappears when hidden. */
+.achievement-toast[hidden] {
+  display: none;
+}
+
+@keyframes achievement-appear {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Mobile improvements. */
+@media (max-width: 600px) {
+  .achievement-summary {
+    text-align: left;
+  }
+
+  .achievement-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievement-toast {
+    animation: none;
+  }
+}
