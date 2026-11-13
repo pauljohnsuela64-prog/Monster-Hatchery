@@ -107,25 +107,111 @@
     </section>
 
     <!-- Monster collection / encyclopedia. -->
-    <section class="panel encyclopedia">
-      <div class="collection-header">
-        <div>
-          <h2>📖 Monster Encyclopedia</h2>
-            <p>
-                Discover all 13 creatures, feed your monsters,
-                and train them to Level 10!
-            
-            </p>
-        </div>
+    
+<!-- Phase 2B: Improved Monster Encyclopedia -->
+<section class="panel encyclopedia">
 
-        <button id="resetBtn" class="reset-button">
-          Reset Progress
-        </button>
-      </div>
+  <div class="collection-header">
+    <div>
+      <h2>📖 Monster Encyclopedia</h2>
+      <p>
+        Discover, train, and collect all 13 monsters!
+      </p>
+    </div>
 
-      <!-- JavaScript creates the monster cards here. -->
-      <div id="collection" class="monster-grid"></div>
-    </section>
+    <button id="resetBtn" class="reset-button">
+      Reset Progress
+    </button>
+  </div>
+
+  <!-- Collection completion progress. -->
+  <div class="collection-progress-section">
+    <div class="progress-heading">
+      <label for="collectionProgress">
+        Collection Completion
+      </label>
+
+      <strong id="collectionProgressLabel">
+        0 / 13 · 0%
+      </strong>
+    </div>
+
+    <progress
+      id="collectionProgress"
+      class="collection-progress-bar"
+      max="13"
+      value="0"
+    ></progress>
+  </div>
+
+  <!-- Filter and sorting controls. -->
+  <div class="collection-toolbar">
+
+    <div class="filter-field">
+      <label for="rarityFilter">Filter by Rarity</label>
+
+      <select id="rarityFilter">
+        <option value="all">All Monsters</option>
+        <option value="Common">Common</option>
+        <option value="Rare">Rare</option>
+        <option value="Epic">Epic</option>
+        <option value="Legendary">Legendary</option>
+        <option value="Mythic">Mythic</option>
+      </select>
+    </div>
+
+    <div class="filter-field">
+      <label for="sortBy">Sort Monsters</label>
+
+      <select id="sortBy">
+        <option value="original">Default Order</option>
+        <option value="name">Name (A-Z)</option>
+        <option value="rarity">Highest Rarity</option>
+        <option value="level">Highest Level</option>
+        <option value="power">Highest Power</option>
+      </select>
+    </div>
+
+    <label class="favorites-filter">
+      <input id="favoritesOnly" type="checkbox">
+      ⭐ Favorites Only
+    </label>
+
+  </div>
+
+  <!-- Displayed when no monsters match the filters. -->
+  <p id="collectionEmpty" class="empty-message" hidden>
+    No discovered monsters match these filters.
+  </p>
+
+  <!-- JavaScript creates all the monster cards here. -->
+  <div id="collection" class="monster-grid"></div>
+
+</section>
+
+<!-- Monster details popup. -->
+<dialog
+  id="monsterDetails"
+  class="details-dialog"
+  aria-labelledby="detailsTitle"
+>
+  <div class="details-header">
+    <h3 id="detailsTitle">Monster Details</h3>
+
+    <button
+      id="detailsClose"
+      type="button"
+      class="details-close"
+      aria-label="Close monster details"
+    >
+      ✕
+    </button>
+  </div>
+
+  <!-- JavaScript inserts monster information here. -->
+  <div id="detailsBody"></div>
+</dialog>
+
 
     <footer>
       <p>Monster Hatchery • Made with HTML, CSS and JavaScript</p>
