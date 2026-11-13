@@ -339,3 +339,101 @@ footer {
     animation: none;
   }
 }
+
+
+
+/* ======================================
+   PHASE 2A - MONSTER TRAINING
+   ====================================== */
+
+/* Separates training information from
+   the basic monster card information. */
+.training {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Monster level label. */
+.training-level {
+  margin: 0;
+  color: #ddd6fe;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Attack power display. */
+.training-power {
+  margin: 0;
+  color: #fcd34d;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* Native HTML progress bar for XP. */
+.xp-bar {
+  width: 100%;
+  height: 13px;
+  accent-color: #a78bfa;
+}
+
+/* XP amount underneath the progress bar. */
+.xp-label {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Monster feeding button. */
+.feed-button {
+  margin-top: 7px;
+  padding: 11px 8px;
+
+  width: 100%;
+  border: 1px solid #a78bfa;
+  border-radius: 10px;
+
+  background: #6d28d9;
+  color: white;
+
+  font-size: 13px;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+/* Hover animation for available buttons. */
+.feed-button:hover:not(:disabled) {
+  background: #7c3aed;
+}
+
+/* Disabled buttons are less prominent. */
+.feed-button:disabled {
+  background: #444461;
+  border-color: #62627e;
+  color: #c4c4d4;
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Slightly improve monster card spacing. */
+.monster-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.monster-card .training {
+  margin-top: auto;
+}
+
+/* Make sure buttons stay easy to tap
+   on small mobile screens. */
+@media (max-width: 480px) {
+  .feed-button {
+    min-height: 44px;
+  }
+}
+
