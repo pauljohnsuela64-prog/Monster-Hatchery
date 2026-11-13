@@ -190,6 +190,47 @@
 </section>
 
 <!-- Monster details popup. -->
+
+<!-- ===================================
+     PHASE 2D - EVOLUTION ANIMATION
+     =================================== -->
+
+<dialog
+  id="evolutionDialog"
+  class="evolution-dialog"
+  aria-labelledby="evolutionTitle"
+>
+  <h2 id="evolutionTitle">✨ Monster Evolution</h2>
+
+  <!-- Displays the original monster, then
+       reveals its evolved appearance. -->
+  <div
+    id="evolutionSprite"
+    class="evolution-sprite"
+    aria-hidden="true"
+  >
+    🥚
+  </div>
+
+  <!-- JavaScript updates this text. -->
+  <p
+    id="evolutionResult"
+    class="evolution-result"
+    role="status"
+    aria-live="polite"
+  >
+    Your monster is evolving!
+  </p>
+
+  <button
+    id="evolutionClose"
+    class="evolution-close"
+    type="button"
+  >
+    Continue
+  </button>
+</dialog>
+
 <dialog
   id="monsterDetails"
   class="details-dialog"

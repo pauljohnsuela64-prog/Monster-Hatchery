@@ -82,6 +82,86 @@ const COOLDOWN_MS = 12000;
 // IMPORTANT: Preserve the old save key.
 const STORAGE_KEY = "monster-hatchery-save-v1";
 
+
+// ========================================
+// PHASE 2D - EVOLUTION SETTINGS
+// ========================================
+
+// These levels unlock each evolution stage.
+const EVOLUTION_LEVELS = [5, 10];
+
+// Power bonuses for Base, Stage 1 and Stage 2.
+const EVOLUTION_POWER_BONUS = [0, 8, 20];
+
+// Labels displayed in the collection and popup.
+const EVOLUTION_LABELS = [
+  "Base Form",
+  "First Evolution",
+  "Final Evolution"
+];
+
+// Each monster gets two additional appearances.
+// Index 0 = Level 5 evolution.
+// Index 1 = Level 10 evolution.
+//
+// We retain the original MONSTERS array and IDs.
+// That keeps existing saves and achievements compatible.
+const EVOLUTION_FORMS = {
+  pebble: [
+    { name: "Stonehound", emoji: "🐕" },
+    { name: "Titanwolf", emoji: "🐺" }
+  ],
+  puff: [
+    { name: "Bloomhare", emoji: "🐇" },
+    { name: "Celestial Hare", emoji: "🌙" }
+  ],
+  moss: [
+    { name: "Thornsprout", emoji: "🌿" },
+    { name: "Ancient Grove", emoji: "🌳" }
+  ],
+  shell: [
+    { name: "Ironback", emoji: "🦎" },
+    { name: "Fortress Turtle", emoji: "🐊" }
+  ],
+  ember: [
+    { name: "Blazetail", emoji: "🔥" },
+    { name: "Inferno Kitsune", emoji: "🐺" }
+  ],
+  aqua: [
+    { name: "Tidefin", emoji: "🐬" },
+    { name: "Leviathan", emoji: "🐋" }
+  ],
+  cloud: [
+    { name: "Mistcat", emoji: "😺" },
+    { name: "Thunderlion", emoji: "🦁" }
+  ],
+  storm: [
+    { name: "Tempest Owl", emoji: "🦅" },
+    { name: "Sky Emperor", emoji: "🦚" }
+  ],
+  crystal: [
+    { name: "Crystal Elk", emoji: "🦌" },
+    { name: "Prism Guardian", emoji: "🦄" }
+  ],
+  phantom: [
+    { name: "Nightwing", emoji: "🦇" },
+    { name: "Void Reaper", emoji: "👻" }
+  ],
+  solar: [
+    { name: "Sun Drake", emoji: "🐲" },
+    { name: "Eclipse Dragon", emoji: "🐉" }
+  ],
+  phoenix: [
+    { name: "Ash Phoenix", emoji: "🐦" },
+    { name: "Eternal Phoenix", emoji: "🔥" }
+  ],
+  star: [
+    { name: "Astral Wyrm", emoji: "🐍" },
+    { name: "Cosmic Sovereign", emoji: "🌠" }
+  ]
+};
+
+
 // ========================================
 // NEW: ACHIEVEMENT DATABASE
 // ========================================
@@ -215,11 +295,17 @@ const ui = {
   achievementsList: document.getElementById("achievementsList"),
   achievementCount: document.getElementById("achievementCount"),
   achievementReady: document.getElementById("achievementReady"),
-  achievementToast: document.getElementById("achievementToast")
+  achievementToast: document.getElementById("achievementToast"),
+  evolutionDialog: document.getElementById("evolutionDialog"),
+  evolutionTitle: document.getElementById("evolutionTitle"),
+  evolutionSprite: document.getElementById("evolutionSprite"),
+  evolutionResult: document.getElementById("evolutionResult"),
+  evolutionClose: document.getElementById("evolutionClose")
 };
 
 let state = loadGame();
 let isHatching = false;
+let isEvolving = false;
 let selectedMonsterId = null;
 
 // Stores the achievements already recognized as unlocked.
@@ -233,9 +319,13 @@ let toastTimer = null;
 // SAVE AND LOAD SYSTEM
 // ========================================
 
+
 /**
- * Creates the default state for new players.
- * NEW: claimedAchievements records collected rewards.
+ * Creates a new game with empty collections,
+ * training, favorites, achievements and evolutions.
+ *
+ * Evolution progress is stored separately
+ * so the original monster IDs never change.
  */
 function createFreshGame() {
   return {
@@ -243,6 +333,7 @@ function createFreshGame() {
     hatches: 0,
     collection: {},
     training: {},
+    evolutions: {},
     favorites: [],
     claimedAchievements: [],
     lastClaim: 0
@@ -297,6 +388,66 @@ function sanitizeTraining(savedTraining, collection) {
 
   return cleaned;
 }
+
+
+/**
+ * Validates evolution stages loaded from storage.
+ *
+ * Stage 0 = Original monster.
+ * Stage 1 = First evolution (requires Level 5).
+ * Stage 2 = Final evolution (requires Level 10).
+ *
+ * Older saves don't contain evolutions, so
+ * their monsters start at their original forms,
+ * without losing any existing levels or XP.
+ *
+ * Invalid stages and evolution levels are corrected.
+ */
+function sanitizeEvolutions(savedEvolutions, collection, training) {
+  const cleaned = {};
+
+  if (
+    !savedEvolutions ||
+    typeof savedEvolutions !== "object" ||
+    Array.isArray(savedEvolutions)
+  ) {
+    return cleaned;
+  }
+
+  for (const monster of MONSTERS) {
+    // Only discovered monsters may be evolved.
+    if (!collection[monster.id]) continue;
+
+    const stage = savedEvolutions[monster.id];
+
+    if (
+      !Number.isSafeInteger(stage) ||
+      stage < 1 ||
+      stage > 2
+    ) {
+      continue;
+    }
+
+    // A monster's saved stage cannot exceed
+    // what its validated level allows.
+    const level = training[monster.id]?.level ?? 1;
+
+    const maximumAllowedStage =
+      level >= 10 ? 2 : level >= 5 ? 1 : 0;
+
+    const safeStage = Math.min(
+      stage,
+      maximumAllowedStage
+    );
+
+    if (safeStage > 0) {
+      cleaned[monster.id] = safeStage;
+    }
+  }
+
+  return cleaned;
+}
+
 
 /**
  * Accepts only valid, discovered favorite monster IDs.
@@ -369,6 +520,9 @@ function loadGame() {
         collection[monster.id] = count;
       }
     }
+    // Validate training once, then use it to
+    // validate the saved evolution stages.
+    const training = sanitizeTraining(saved.training, collection);
 
     return {
       coins:
@@ -383,7 +537,12 @@ function loadGame() {
 
       collection,
 
-      training: sanitizeTraining(saved.training, collection),
+        training,
+        evolutions: sanitizeEvolutions(
+        saved.evolutions,
+        collection,
+        training
+),
 
       favorites: sanitizeFavorites(saved.favorites, collection),
 
@@ -431,22 +590,239 @@ function getTraining(monsterId) {
   };
 }
 
+
+/**
+ * Returns the current evolution stage of a species.
+ *
+ * Monsters without an evolution record are Stage 0.
+ */
+function getEvolutionStage(monsterId) {
+  return state.evolutions[monsterId] || 0;
+}
+
+/**
+ * Returns the name and emoji that should be
+ * displayed for a monster's current form.
+ *
+ * The original monster object stays unchanged.
+ * Only its appearance changes.
+ *
+ * This helps retain existing collection IDs,
+ * achievements, favorites and duplicate counts.
+ */
+function getMonsterAppearance(monster) {
+  const stage = getEvolutionStage(monster.id);
+
+  // Base form uses the original monster data.
+  if (stage === 0) {
+    return {
+      name: monster.name,
+      emoji: monster.emoji
+    };
+  }
+
+  // Stage 1 uses index 0; Stage 2 uses index 1.
+  return EVOLUTION_FORMS[monster.id][stage - 1];
+}
+
+
 /**
  * Calculates monster power using rarity and level.
  */
+
+/**
+ * Calculates total monster power from:
+ * 1. Base rarity
+ * 2. Training level
+ * 3. Evolution stage bonus
+ *
+ * Evolution bonuses:
+ * Base = +0, Stage 1 = +8, Stage 2 = +20.
+ */
 function getMonsterPower(monster) {
   const progress = getTraining(monster.id);
+  const stage = getEvolutionStage(monster.id);
+
+  const levelPower = (progress.level - 1) * 3;
+  const evolutionBonus = EVOLUTION_POWER_BONUS[stage];
 
   return BASE_POWER[monster.rarity] +
-    (progress.level - 1) * 3;
+    levelPower +
+    evolutionBonus;
 }
+
+
+// ========================================
+// PHASE 2D - EVOLUTION GAMEPLAY
+// ========================================
+
+/**
+ * Evolves one discovered monster to its next stage.
+ *
+ * The player must have the required level:
+ * Stage 0 -> Stage 1 requires Level 5.
+ * Stage 1 -> Stage 2 requires Level 10.
+ *
+ * Only one stage is unlocked per click.
+ * We save immediately before playing the animation,
+ * preventing progress loss if the page refreshes.
+ */
+function evolveMonster(monsterId) {
+  if (isHatching || isEvolving) return;
+
+  const monster = MONSTERS.find(
+    item => item.id === monsterId
+  );
+
+  if (!monster || !state.collection[monsterId]) {
+    return;
+  }
+
+  const currentStage = getEvolutionStage(monsterId);
+
+  // Final evolution is the maximum stage.
+  if (currentStage >= 2) {
+    setStatus(`${monster.name} is fully evolved!`);
+    return;
+  }
+
+  const requiredLevel = EVOLUTION_LEVELS[currentStage];
+  const currentLevel = getTraining(monsterId).level;
+
+  if (currentLevel < requiredLevel) {
+    setStatus(
+      `🔒 Evolution requires Level ${requiredLevel}.`
+    );
+    return;
+  }
+
+  // Remember the original appearance for the animation.
+  const previousForm = getMonsterAppearance(monster);
+
+  // Update only the evolution stage.
+  // Collection count, level and XP are preserved.
+  state.evolutions[monsterId] = currentStage + 1;
+
+  saveGame();
+  isEvolving = true;
+
+  // Prepare the evolution popup.
+  ui.evolutionTitle.textContent = "✨ Monster Evolution";
+  ui.evolutionSprite.textContent = previousForm.emoji;
+
+  ui.evolutionResult.textContent =
+    `${previousForm.name} is transforming...`;
+
+  ui.evolutionClose.disabled = true;
+
+  // Start the glowing animation.
+  ui.evolutionSprite.classList.add("is-transforming");
+
+  if (!ui.evolutionDialog.open) {
+    ui.evolutionDialog.showModal();
+  }
+
+  // Disable other game actions during transformation.
+  renderCollection();
+  updateButtons();
+
+  // Reveal the evolved creature after 1.8 seconds.
+  window.setTimeout(() => {
+    const newForm = getMonsterAppearance(monster);
+
+    ui.evolutionSprite.classList.remove("is-transforming");
+    ui.evolutionSprite.textContent = newForm.emoji;
+
+    ui.evolutionTitle.textContent =
+      "🎉 Evolution Complete!";
+
+    ui.evolutionResult.textContent =
+      `${previousForm.name} evolved into ${newForm.name}! ` +
+      `Power: ${getMonsterPower(monster)}.`;
+
+    isEvolving = false;
+    ui.evolutionClose.disabled = false;
+
+    // Refresh names, emojis, power and buttons.
+    renderCollection();
+    updateButtons();
+
+    // Refresh the details panel if it is open.
+    if (
+      ui.detailsDialog.open &&
+      selectedMonsterId === monsterId
+    ) {
+      renderMonsterDetails(monster);
+    }
+
+    setStatus(`✨ ${newForm.name} has evolved!`);
+  }, 1800);
+}
+
+/**
+ * Creates the evolution controls underneath
+ * a discovered monster's training controls.
+ *
+ * The button is locked until the monster
+ * reaches the required evolution level.
+ */
+function createEvolutionControls(monster) {
+  const container = document.createElement("div");
+  container.className = "evolution-controls";
+
+  const stage = getEvolutionStage(monster.id);
+  const level = getTraining(monster.id).level;
+
+  const form = getMonsterAppearance(monster);
+
+  const stageText = document.createElement("p");
+  stageText.className = "evolution-stage";
+  stageText.textContent = EVOLUTION_LABELS[stage];
+
+  const formText = document.createElement("p");
+  formText.className = "evolution-form";
+  formText.textContent = `✨ ${form.name}`;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "evolution-button";
+  button.dataset.monsterId = monster.id;
+
+  // Disable evolution when maximum stage is reached.
+  if (stage >= 2) {
+    button.textContent = "🌟 Fully Evolved";
+    button.disabled = true;
+  } else {
+    const requiredLevel = EVOLUTION_LEVELS[stage];
+    const canEvolve = level >= requiredLevel;
+
+    button.textContent = canEvolve
+      ? "✨ Evolve Now!"
+      : `🔒 Evolve at Level ${requiredLevel}`;
+
+    button.disabled =
+      !canEvolve || isHatching || isEvolving;
+  }
+
+  // Each button evolves the species on its own card.
+  button.addEventListener("click", () => {
+    evolveMonster(monster.id);
+  });
+
+  container.append(stageText, formText, button);
+
+  return container;
+}
+
+
 
 /**
  * Feeds one species for 15 coins and grants 20 XP.
  * NEW: Checks whether training unlocks achievements.
  */
 function feedMonster(monsterId) {
-  if (isHatching) return;
+  // Do not process actions during another animation.
+  if (isHatching || isEvolving) return;
 
   const monster = MONSTERS.find(
     item => item.id === monsterId
@@ -552,7 +928,7 @@ function createTrainingControls(monster) {
     : `🍖 Feed · ${FEED_COST} Coins`;
 
   feedButton.disabled =
-    isHatching || maxed || state.coins < FEED_COST;
+    isEvolving || isHatching || maxed || state.coins < FEED_COST;
 
   feedButton.addEventListener("click", () => {
     feedMonster(monster.id);
@@ -564,6 +940,170 @@ function createTrainingControls(monster) {
 
   return container;
 }
+
+
+// ========================================
+// PHASE 2D - EVOLUTION GAMEPLAY
+// ========================================
+
+/**
+ * Evolves one discovered monster to its next stage.
+ *
+ * The player must have the required level:
+ * Stage 0 -> Stage 1 requires Level 5.
+ * Stage 1 -> Stage 2 requires Level 10.
+ *
+ * Only one stage is unlocked per click.
+ * We save immediately before playing the animation,
+ * preventing progress loss if the page refreshes.
+ */
+function evolveMonster(monsterId) {
+  if (isHatching || isEvolving) return;
+
+  const monster = MONSTERS.find(
+    item => item.id === monsterId
+  );
+
+  if (!monster || !state.collection[monsterId]) {
+    return;
+  }
+
+  const currentStage = getEvolutionStage(monsterId);
+
+  // Final evolution is the maximum stage.
+  if (currentStage >= 2) {
+    setStatus(`${monster.name} is fully evolved!`);
+    return;
+  }
+
+  const requiredLevel = EVOLUTION_LEVELS[currentStage];
+  const currentLevel = getTraining(monsterId).level;
+
+  if (currentLevel < requiredLevel) {
+    setStatus(
+      `🔒 Evolution requires Level ${requiredLevel}.`
+    );
+    return;
+  }
+
+  // Remember the original appearance for the animation.
+  const previousForm = getMonsterAppearance(monster);
+
+  // Update only the evolution stage.
+  // Collection count, level and XP are preserved.
+  state.evolutions[monsterId] = currentStage + 1;
+
+  saveGame();
+  isEvolving = true;
+
+  // Prepare the evolution popup.
+  ui.evolutionTitle.textContent = "✨ Monster Evolution";
+  ui.evolutionSprite.textContent = previousForm.emoji;
+
+  ui.evolutionResult.textContent =
+    `${previousForm.name} is transforming...`;
+
+  ui.evolutionClose.disabled = true;
+
+  // Start the glowing animation.
+  ui.evolutionSprite.classList.add("is-transforming");
+
+  if (!ui.evolutionDialog.open) {
+    ui.evolutionDialog.showModal();
+  }
+
+  // Disable other game actions during transformation.
+  renderCollection();
+  updateButtons();
+
+  // Reveal the evolved creature after 1.8 seconds.
+  window.setTimeout(() => {
+    const newForm = getMonsterAppearance(monster);
+
+    ui.evolutionSprite.classList.remove("is-transforming");
+    ui.evolutionSprite.textContent = newForm.emoji;
+
+    ui.evolutionTitle.textContent =
+      "🎉 Evolution Complete!";
+
+    ui.evolutionResult.textContent =
+      `${previousForm.name} evolved into ${newForm.name}! ` +
+      `Power: ${getMonsterPower(monster)}.`;
+
+    isEvolving = false;
+    ui.evolutionClose.disabled = false;
+
+    // Refresh names, emojis, power and buttons.
+    renderCollection();
+    updateButtons();
+
+    // Refresh the details panel if it is open.
+    if (
+      ui.detailsDialog.open &&
+      selectedMonsterId === monsterId
+    ) {
+      renderMonsterDetails(monster);
+    }
+
+    setStatus(`✨ ${newForm.name} has evolved!`);
+  }, 1800);
+}
+
+/**
+ * Creates the evolution controls underneath
+ * a discovered monster's training controls.
+ *
+ * The button is locked until the monster
+ * reaches the required evolution level.
+ */
+function createEvolutionControls(monster) {
+  const container = document.createElement("div");
+  container.className = "evolution-controls";
+
+  const stage = getEvolutionStage(monster.id);
+  const level = getTraining(monster.id).level;
+
+  const form = getMonsterAppearance(monster);
+
+  const stageText = document.createElement("p");
+  stageText.className = "evolution-stage";
+  stageText.textContent = EVOLUTION_LABELS[stage];
+
+  const formText = document.createElement("p");
+  formText.className = "evolution-form";
+  formText.textContent = `✨ ${form.name}`;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "evolution-button";
+  button.dataset.monsterId = monster.id;
+
+  // Disable evolution when maximum stage is reached.
+  if (stage >= 2) {
+    button.textContent = "🌟 Fully Evolved";
+    button.disabled = true;
+  } else {
+    const requiredLevel = EVOLUTION_LEVELS[stage];
+    const canEvolve = level >= requiredLevel;
+
+    button.textContent = canEvolve
+      ? "✨ Evolve Now!"
+      : `🔒 Evolve at Level ${requiredLevel}`;
+
+    button.disabled =
+      !canEvolve || isHatching || isEvolving;
+  }
+
+  // Each button evolves the species on its own card.
+  button.addEventListener("click", () => {
+    evolveMonster(monster.id);
+  });
+
+  container.append(stageText, formText, button);
+
+  return container;
+}
+
 
 // ========================================
 // EGG RANDOMIZATION
@@ -685,22 +1225,35 @@ function createDetailRow(label, value) {
 /**
  * Fills the popup with monster stats and XP progress.
  */
+
+/**
+ * Displays the current monster appearance,
+ * evolution stage, rarity, level, power and XP.
+ *
+ * Evolution does not change the underlying
+ * collection count or monster ID.
+ */
 function renderMonsterDetails(monster) {
   const progress = getTraining(monster.id);
   const maxed = progress.level >= MAX_LEVEL;
 
-  ui.detailsTitle.textContent = monster.name;
+  const stage = getEvolutionStage(monster.id);
+  const form = getMonsterAppearance(monster);
+
+  ui.detailsTitle.textContent = form.name;
   ui.detailsBody.replaceChildren();
 
   const hero = document.createElement("div");
   hero.className = "details-hero";
-  hero.textContent = monster.emoji;
+  hero.textContent = form.emoji;
 
   const stats = document.createElement("div");
   stats.className = "details-stats";
 
   stats.append(
+    createDetailRow("Original Species", monster.name),
     createDetailRow("Rarity", monster.rarity),
+    createDetailRow("Evolution", EVOLUTION_LABELS[stage]),
     createDetailRow("Owned", state.collection[monster.id] || 0),
     createDetailRow("Level", `${progress.level} / ${MAX_LEVEL}`),
     createDetailRow("Power", getMonsterPower(monster)),
@@ -712,22 +1265,25 @@ function renderMonsterDetails(monster) {
 
   const xpBar = document.createElement("progress");
   xpBar.className = "xp-bar details-xp";
+
   xpBar.max = maxed ? 1 : xpToNextLevel(progress.level);
   xpBar.value = maxed ? 1 : progress.xp;
 
   xpBar.setAttribute(
     "aria-label",
-    `${monster.name} experience`
+    `${form.name} experience`
   );
 
   const xpText = document.createElement("p");
   xpText.className = "hint";
+
   xpText.textContent = maxed
     ? "⭐ Maximum level reached"
     : `Experience: ${progress.xp} / ${xpToNextLevel(progress.level)} XP`;
 
   ui.detailsBody.append(hero, stats, xpBar, xpText);
 }
+
 
 /**
  * Opens the details modal for a discovered monster.
@@ -820,21 +1376,27 @@ function getFilteredMonsters() {
     if (sortBy === "rarity") {
       return (
         RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] ||
-        a.name.localeCompare(b.name)
+        getMonsterAppearance(a).name.localeCompare(
+        getMonsterAppearance(b).name
+    )
       );
     }
 
     if (sortBy === "level") {
       return (
         getTraining(b.id).level - getTraining(a.id).level ||
-        a.name.localeCompare(b.name)
+        getMonsterAppearance(a).name.localeCompare(
+        getMonsterAppearance(b).name
+        )
       );
     }
 
     if (sortBy === "power") {
       return (
         getMonsterPower(b) - getMonsterPower(a) ||
-        a.name.localeCompare(b.name)
+        getMonsterAppearance(a).name.localeCompare(
+        getMonsterAppearance(b).name
+            )
       );
     }
 
@@ -921,7 +1483,8 @@ function isAchievementUnlocked(achievement) {
  * We save the coins and claim record together.
  */
 function claimAchievement(achievementId) {
-  if (isHatching) return;
+  // Do not process actions during another animation.
+  if (isHatching || isEvolving) return;
 
   const achievement = ACHIEVEMENTS.find(
     item => item.id === achievementId
@@ -1155,21 +1718,28 @@ function setStatus(message) {
   ui.status.textContent = message;
 }
 
+
+
 /**
- * Creates a card for a discovered monster.
+ * Creates a card using the monster's current form.
+ *
+ * NEW: Evolved monsters show their new names
+ * and emojis while keeping their original rarity
+ * and collection counts.
  */
 function createMonsterCard(monster, count) {
-  const card = document.createElement("article");
+  const form = getMonsterAppearance(monster);
 
+  const card = document.createElement("article");
   card.className =
     `monster-card rarity-${monster.rarity.toLowerCase()}`;
 
   const emoji = document.createElement("div");
   emoji.className = "monster-emoji";
-  emoji.textContent = monster.emoji;
+  emoji.textContent = form.emoji;
 
   const name = document.createElement("h3");
-  name.textContent = monster.name;
+  name.textContent = form.name;
 
   const rarity = document.createElement("p");
   rarity.textContent = monster.rarity;
@@ -1178,6 +1748,7 @@ function createMonsterCard(monster, count) {
   countText.textContent = `Owned: ${count}`;
 
   card.append(emoji, name, rarity, countText);
+
   return card;
 }
 
@@ -1256,7 +1827,8 @@ function renderCollection() {
 
     card.append(
       actions,
-      createTrainingControls(monster)
+      createTrainingControls(monster),
+      createEvolutionControls(monster)
     );
 
     ui.collection.append(card);
@@ -1269,7 +1841,16 @@ function renderCollection() {
  * NEW: Achievement claim buttons are also
  * disabled during egg hatching.
  */
+
+/**
+ * Updates game buttons and cooldowns.
+ *
+ * NEW: The busy flag prevents other actions
+ * while an egg is hatching or a monster evolves.
+ */
 function updateButtons() {
+  const busy = isHatching || isEvolving;
+
   const elapsed = Date.now() - state.lastClaim;
 
   const remaining = Math.max(
@@ -1277,7 +1858,8 @@ function updateButtons() {
     Math.ceil((COOLDOWN_MS - elapsed) / 1000)
   );
 
-  ui.claimBtn.disabled = remaining > 0;
+  // Free coin button.
+  ui.claimBtn.disabled = remaining > 0 || busy;
 
   ui.claimBtn.textContent = remaining > 0
     ? `⏳ Gather again in ${remaining}s`
@@ -1287,11 +1869,12 @@ function updateButtons() {
     ? `Next free coins in ${remaining} seconds.`
     : "Gather free coins every 12 seconds.";
 
-  ui.meadowBtn.disabled = isHatching;
-  ui.moonBtn.disabled = isHatching;
-  ui.resetBtn.disabled = isHatching;
+  // Hatching and reset buttons.
+  ui.meadowBtn.disabled = busy;
+  ui.moonBtn.disabled = busy;
+  ui.resetBtn.disabled = busy;
 
-  // Refresh all monster feeding buttons.
+  // Monster feeding buttons.
   const feedButtons =
     ui.collection.querySelectorAll(".feed-button");
 
@@ -1299,12 +1882,12 @@ function updateButtons() {
     const progress = getTraining(button.dataset.monsterId);
 
     button.disabled =
-      isHatching ||
+      busy ||
       progress.level >= MAX_LEVEL ||
       state.coins < FEED_COST;
   }
 
-  // NEW: Refresh all achievement claim buttons.
+  // Achievement reward buttons.
   const claimButtons =
     ui.achievementsList.querySelectorAll(".achievement-claim");
 
@@ -1314,12 +1897,30 @@ function updateButtons() {
     );
 
     button.disabled =
-      isHatching ||
+      busy ||
       !achievement ||
       !isAchievementUnlocked(achievement) ||
       state.claimedAchievements.includes(achievement.id);
   }
+
+  // NEW: Monster evolution buttons.
+  const evolutionButtons =
+    ui.collection.querySelectorAll(".evolution-button");
+
+  for (const button of evolutionButtons) {
+    const monsterId = button.dataset.monsterId;
+    const stage = getEvolutionStage(monsterId);
+
+    const requiredLevel = EVOLUTION_LEVELS[stage];
+    const currentLevel = getTraining(monsterId).level;
+
+    button.disabled =
+      busy ||
+      stage >= 2 ||
+      currentLevel < requiredLevel;
+  }
 }
+
 
 // ========================================
 // EGG HATCHING
@@ -1330,7 +1931,8 @@ function updateButtons() {
  * awards duplicates and starts the animation.
  */
 function startHatch(egg) {
-  if (isHatching) return;
+  // Do not process actions during another animation.
+  if (isHatching || isEvolving) return;
 
   if (state.coins < egg.cost) {
     setStatus("❌ Not enough coins! Gather more coins first.");
@@ -1392,8 +1994,7 @@ function finishHatch(monster, duplicate, bonus) {
 
   ui.egg.classList.remove("is-hatching");
   ui.egg.classList.add("revealed");
-  ui.egg.textContent = monster.emoji;
-
+  ui.egg.textContent = getMonsterAppearance(monster).emoji;
   const card = createMonsterCard(
     monster,
     state.collection[monster.id]
@@ -1464,7 +2065,8 @@ function claimCoins() {
  * NEW: Achievement claims reset as well.
  */
 function resetProgress() {
-  if (isHatching) return;
+  // Do not process actions during another animation.
+  if (isHatching || isEvolving) return;
 
   const confirmed = window.confirm(
     "Reset coins, monsters, levels, favorites and achievements?"
@@ -1481,6 +2083,10 @@ function resetProgress() {
 
   if (ui.detailsDialog.open) {
     ui.detailsDialog.close();
+  }
+
+  if (ui.evolutionDialog.open) {
+  ui.evolutionDialog.close();
   }
 
   selectedMonsterId = null;
@@ -1518,6 +2124,18 @@ ui.meadowBtn.addEventListener("click", () => {
 // Purchase Moon Egg.
 ui.moonBtn.addEventListener("click", () => {
   startHatch(EGGS.moon);
+});
+
+ui.evolutionClose.addEventListener("click", () => {
+  if (!isEvolving) {
+    ui.evolutionDialog.close();
+  }
+});
+
+ui.evolutionDialog.addEventListener("cancel", event => {
+  if (isEvolving) {
+    event.preventDefault();
+  }
 });
 
 // Gather coins and reset game.

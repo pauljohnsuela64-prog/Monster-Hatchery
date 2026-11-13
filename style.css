@@ -866,3 +866,159 @@ footer {
     animation: none;
   }
 }
+
+
+
+/* ======================================
+   PHASE 2D - MONSTER EVOLUTION
+   ====================================== */
+
+/* Evolution controls inside monster cards. */
+.evolution-controls {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.evolution-stage {
+  margin: 0;
+  text-align: center;
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* Button used for unlocking an evolution. */
+.evolution-button {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+
+  border: 1px solid #facc15;
+  border-radius: 10px;
+  background: #a16207;
+  color: #fff;
+
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.evolution-button:hover:not(:disabled) {
+  background: #ca8a04;
+}
+
+.evolution-button:disabled {
+  background: #383b56;
+  border-color: #525775;
+  color: #b6b7ce;
+  cursor: not-allowed;
+}
+
+/* Evolution stage shown on the monster card. */
+.evolution-form {
+  margin: 6px 0 0;
+  color: #ddd6fe;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Evolution popup. */
+.evolution-dialog {
+  width: min(450px, calc(100% - 32px));
+  padding: 28px;
+
+  background: #211a42;
+  border: 2px solid #a78bfa;
+  border-radius: 22px;
+
+  color: white;
+  text-align: center;
+  box-shadow: 0 20px 75px #000a;
+}
+
+.evolution-dialog::backdrop {
+  background: #050515d9;
+}
+
+.evolution-dialog h2 {
+  color: #fcd34d;
+  margin-bottom: 20px;
+}
+
+/* Large animated monster emoji. */
+.evolution-sprite {
+  display: grid;
+  place-items: center;
+
+  width: 190px;
+  height: 190px;
+  margin: 16px auto;
+
+  font-size: 105px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #7254b1,
+    #211a42 75%
+  );
+
+  box-shadow: 0 0 45px #a78bfa77;
+}
+
+/* Apply this class while evolution happens. */
+.evolution-sprite.is-transforming {
+  animation: monster-transform 0.55s ease-in-out infinite alternate;
+}
+
+/* The monster scales, rotates and glows. */
+@keyframes monster-transform {
+  from {
+    transform: scale(0.82) rotate(-12deg);
+    filter: brightness(1);
+    box-shadow: 0 0 20px #a78bfa88;
+  }
+
+  to {
+    transform: scale(1.17) rotate(12deg);
+    filter: brightness(1.7);
+    box-shadow: 0 0 75px #facc15cc;
+  }
+}
+
+.evolution-result {
+  min-height: 54px;
+  color: #e9d5ff;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.evolution-close {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 12px;
+
+  border: 0;
+  border-radius: 12px;
+  background: #7c3aed;
+  color: white;
+
+  font-weight: bold;
+}
+
+.evolution-close:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Accessible alternative for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .evolution-sprite.is-transforming {
+    animation: none;
+  }
+}
+
