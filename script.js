@@ -2,12 +2,12 @@
 "use strict";
 
 // ========================================
-// MONSTER HATCHERY - PHASE 2A
-// Monster leveling, feeding, XP and power
+// MONSTER HATCHERY - PHASE 2B
+// Collection improvements + existing gameplay
 // ========================================
 
 // 1. MONSTER DATABASE
-// Each object represents one collectible monster.
+// Every monster has a unique ID, name, emoji and rarity.
 const MONSTERS = [
   { id: "pebble", name: "Pebblepup", emoji: "🐶", rarity: "Common" },
   { id: "puff", name: "Puffbun", emoji: "🐰", rarity: "Common" },
@@ -28,8 +28,7 @@ const MONSTERS = [
   { id: "star", name: "Star Serpent", emoji: "🌌", rarity: "Mythic" }
 ];
 
-// 2. EGG TYPES
-// Odds are percentages and must total 100 per egg.
+// 2. EGG TYPES AND PROBABILITIES
 const EGGS = {
   meadow: {
     name: "Meadow Egg",
@@ -42,6 +41,7 @@ const EGGS = {
       Mythic: 1
     }
   },
+
   moon: {
     name: "Moon Egg",
     cost: 100,
@@ -55,7 +55,7 @@ const EGGS = {
   }
 };
 
-// 3. REWARDS AND TRAINING SETTINGS
+// 3. GAME CONFIGURATION
 const DUPLICATE_REWARDS = {
   Common: 10,
   Rare: 20,
@@ -72,44 +72,75 @@ const BASE_POWER = {
   Mythic: 30
 };
 
+// Used to sort monsters from highest to lowest rarity.
+const RARITY_RANK = {
+  Common: 0,
+  Rare: 1,
+  Epic: 2,
+  Legendary: 3,
+  Mythic: 4
+};
+
 const FEED_COST = 15;
 const FEED_XP = 20;
 const MAX_LEVEL = 10;
 const COOLDOWN_MS = 12000;
 
-// IMPORTANT: Keep the v1 save key unchanged.
-// This allows us to load the original v1 collection.
+// Keep the exact same save key as v1 and Phase 2A.
+// Changing this key would create a separate save.
 const STORAGE_KEY = "monster-hatchery-save-v1";
 
-// 4. HTML ELEMENT REFERENCES
-// These let JavaScript interact with our webpage.
+// 4. FIND THE HTML ELEMENTS
 const ui = {
   coins: document.getElementById("coins"),
   discovered: document.getElementById("discovered"),
   hatches: document.getElementById("hatches"),
+
   egg: document.getElementById("egg"),
   status: document.getElementById("status"),
   meadowBtn: document.getElementById("meadowBtn"),
   moonBtn: document.getElementById("moonBtn"),
   claimBtn: document.getElementById("claimBtn"),
   claimHint: document.getElementById("claimHint"),
+
   result: document.getElementById("result"),
   collection: document.getElementById("collection"),
-  resetBtn: document.getElementById("resetBtn")
+  resetBtn: document.getElementById("resetBtn"),
+
+  // NEW: Collection controls.
+  collectionProgress: document.getElementById("collectionProgress"),
+  collectionProgressLabel: document.getElementById("collectionProgressLabel"),
+  rarityFilter: document.getElementById("rarityFilter"),
+  sortBy: document.getElementById("sortBy"),
+  favoritesOnly: document.getElementById("favoritesOnly"),
+  collectionEmpty: document.getElementById("collectionEmpty"),
+
+  // NEW: Monster details dialog.
+  detailsDialog: document.getElementById("monsterDetails"),
+  detailsTitle: document.getElementById("detailsTitle"),
+  detailsBody: document.getElementById("detailsBody"),
+  detailsClose: document.getElementById("detailsClose")
 };
 
-// Load existing progress before displaying the game.
+// Load existing saved progress.
 let state = loadGame();
+
+// Prevent overlapping hatch animations.
 let isHatching = false;
 
+// Tracks which monster is being viewed in the dialog.
+let selectedMonsterId = null;
+
 // ========================================
-// SAVE SYSTEM
+// SAVE AND LOAD SYSTEM
 // ========================================
 
 /**
- * Creates a brand-new game.
+ * Creates starting data for a new game.
  *
- * NEW: training stores monster levels and XP.
+ * Phase 2B adds a favorites array.
+ * An array is useful because a player may have
+ * multiple favorite monster IDs.
  */
 function createFreshGame() {
   return {
@@ -117,31 +148,23 @@ function createFreshGame() {
     hatches: 0,
     collection: {},
     training: {},
+    favorites: [],
     lastClaim: 0
   };
 }
 
 /**
- * Calculates how much XP a monster needs to
- * advance from its current level.
- *
- * Level 1 requires 30 XP.
- * Level 2 requires 60 XP.
- * Level 3 requires 90 XP, and so on.
+ * Returns the XP needed to reach the next level.
  */
 function xpToNextLevel(level) {
   return level * 30;
 }
 
 /**
- * Checks and cleans saved training information.
+ * Cleans saved training information.
  *
- * Old v1 saves have no training property.
- * We accept that and give existing monsters
- * Level 1 and 0 XP automatically.
- *
- * This also prevents invalid levels and XP
- * values from breaking the interface.
+ * Existing Phase 1 monsters without training
+ * automatically use Level 1 and 0 XP.
  */
 function sanitizeTraining(savedTraining, collection) {
   const cleanTraining = {};
@@ -151,7 +174,6 @@ function sanitizeTraining(savedTraining, collection) {
   }
 
   for (const monster of MONSTERS) {
-    // A player cannot train an unowned monster.
     if (!collection[monster.id]) continue;
 
     const progress = savedTraining[monster.id];
@@ -173,8 +195,6 @@ function sanitizeTraining(savedTraining, collection) {
       continue;
     }
 
-    // XP is always below the next-level threshold.
-    // Max-level monsters no longer accumulate XP.
     cleanTraining[monster.id] = {
       level,
       xp: level === MAX_LEVEL
@@ -187,10 +207,34 @@ function sanitizeTraining(savedTraining, collection) {
 }
 
 /**
- * Loads the saved game from the browser.
+ * NEW: Validates the favorites array.
  *
- * The old coins, hatch count, collection,
- * and free-coin cooldown remain compatible.
+ * Only discovered monster IDs are accepted.
+ * A Set removes duplicate entries automatically.
+ *
+ * Old saves have no favorites, so they return [].
+ */
+function sanitizeFavorites(savedFavorites, collection) {
+  if (!Array.isArray(savedFavorites)) {
+    return [];
+  }
+
+  const validIds = new Set(
+    MONSTERS
+      .filter(monster => collection[monster.id] > 0)
+      .map(monster => monster.id)
+  );
+
+  return [...new Set(
+    savedFavorites.filter(id => validIds.has(id))
+  )];
+}
+
+/**
+ * Loads a saved game from localStorage.
+ *
+ * This supports v1, Phase 2A and Phase 2B saves
+ * without erasing existing collection progress.
  */
 function loadGame() {
   try {
@@ -207,7 +251,10 @@ function loadGame() {
     }
 
     const collection = {};
-    const savedCollection = saved.collection || {};
+    const savedCollection =
+      saved.collection && typeof saved.collection === "object"
+        ? saved.collection
+        : {};
 
     for (const monster of MONSTERS) {
       const count = savedCollection[monster.id];
@@ -230,8 +277,10 @@ function loadGame() {
 
       collection,
 
-      // NEW: loads levels, or initializes them from v1.
       training: sanitizeTraining(saved.training, collection),
+
+      // NEW: Load favorites without affecting old data.
+      favorites: sanitizeFavorites(saved.favorites, collection),
 
       lastClaim:
         Number.isFinite(saved.lastClaim) && saved.lastClaim >= 0
@@ -245,8 +294,7 @@ function loadGame() {
 }
 
 /**
- * Saves the entire game, including training,
- * as JSON inside localStorage.
+ * Saves coins, collection, training and favorites.
  */
 function saveGame() {
   try {
@@ -257,14 +305,12 @@ function saveGame() {
 }
 
 // ========================================
-// MONSTER TRAINING - NEW IN PHASE 2A
+// MONSTER TRAINING (PHASE 2A)
 // ========================================
 
 /**
- * Returns one monster's training data.
- *
- * If an existing v1 monster has never been
- * trained, it starts at Level 1 with 0 XP.
+ * Gets the level and XP of a monster.
+ * Monsters without training start at Level 1.
  */
 function getTraining(monsterId) {
   return state.training[monsterId] || {
@@ -274,10 +320,8 @@ function getTraining(monsterId) {
 }
 
 /**
- * Calculates a monster's attack power.
- *
- * Rarer monsters have higher starting power.
- * Each additional level adds 3 power.
+ * Calculates monster power from its rarity
+ * and current training level.
  */
 function getMonsterPower(monster) {
   const progress = getTraining(monster.id);
@@ -287,21 +331,16 @@ function getMonsterPower(monster) {
 }
 
 /**
- * Feeds an owned monster.
- *
- * Each feeding costs 15 coins and grants 20 XP.
- * A loop checks whether enough XP has been
- * earned for one or more level increases.
+ * Feeds an owned monster for 15 coins.
+ * Grants 20 XP and processes level increases.
  */
 function feedMonster(monsterId) {
-  // Prevent feeding during a hatch animation.
   if (isHatching) return;
 
   const monster = MONSTERS.find(
     item => item.id === monsterId
   );
 
-  // Do not allow training an unknown monster.
   if (!monster || !state.collection[monsterId]) {
     return;
   }
@@ -318,50 +357,46 @@ function feedMonster(monsterId) {
     return;
   }
 
-  // Deduct coins and add XP.
   state.coins -= FEED_COST;
 
   let level = current.level;
   let xp = current.xp + FEED_XP;
 
-  // A while loop handles XP crossing a level threshold.
   while (level < MAX_LEVEL && xp >= xpToNextLevel(level)) {
     xp -= xpToNextLevel(level);
-    level += 1;
+    level++;
   }
 
-  // Stop earning XP after reaching Level 10.
   if (level === MAX_LEVEL) {
     xp = 0;
   }
 
   state.training[monsterId] = { level, xp };
-
-  // Save the upgrade immediately.
   saveGame();
 
   if (level > current.level) {
-    setStatus(
-      `🎉 ${monster.name} reached Level ${level}!`
-    );
+    setStatus(`🎉 ${monster.name} reached Level ${level}!`);
   } else {
-    setStatus(
-      `🍖 ${monster.name} gained ${FEED_XP} XP!`
-    );
+    setStatus(`🍖 ${monster.name} gained ${FEED_XP} XP!`);
   }
 
-  // Refresh the statistics and monster cards.
   renderStats();
   renderCollection();
   updateButtons();
+
+  // If the details popup shows this monster,
+  // update its level and XP information too.
+  if (
+    ui.detailsDialog.open &&
+    selectedMonsterId === monsterId
+  ) {
+    renderMonsterDetails(monster);
+  }
 }
 
 /**
- * Builds the new training area beneath an owned
- * monster card.
- *
- * We create HTML elements using JavaScript.
- * This provides levels, XP bars, power and buttons.
+ * Creates the feed button, XP bar and power
+ * display for a discovered monster.
  */
 function createTrainingControls(monster) {
   const progress = getTraining(monster.id);
@@ -380,12 +415,9 @@ function createTrainingControls(monster) {
   powerText.textContent =
     `⚔️ Power ${getMonsterPower(monster)}`;
 
-  // The built-in progress element displays an XP bar.
   const xpBar = document.createElement("progress");
   xpBar.className = "xp-bar";
-  xpBar.max = isMaxLevel
-    ? 1
-    : xpToNextLevel(progress.level);
+  xpBar.max = isMaxLevel ? 1 : xpToNextLevel(progress.level);
   xpBar.value = isMaxLevel ? 1 : progress.xp;
 
   xpBar.setAttribute(
@@ -395,6 +427,7 @@ function createTrainingControls(monster) {
 
   const xpText = document.createElement("small");
   xpText.className = "xp-label";
+
   xpText.textContent = isMaxLevel
     ? "MAX LEVEL"
     : `${progress.xp} / ${xpToNextLevel(progress.level)} XP`;
@@ -413,7 +446,8 @@ function createTrainingControls(monster) {
     isMaxLevel ||
     state.coins < FEED_COST;
 
-  // Clicking this specific card trains its monster.
+  // This button feeds the monster associated
+  // with its particular encyclopedia card.
   feedButton.addEventListener("click", () => {
     feedMonster(monster.id);
   });
@@ -430,11 +464,11 @@ function createTrainingControls(monster) {
 }
 
 // ========================================
-// RANDOM HATCHING
+// RANDOM EGG HATCHING
 // ========================================
 
 /**
- * Selects a rarity using the egg's percentages.
+ * Uses weighted probability to select rarity.
  */
 function rollRarity(odds) {
   let roll = Math.random() * 100;
@@ -451,7 +485,7 @@ function rollRarity(odds) {
 }
 
 /**
- * Randomly selects a monster from a rarity group.
+ * Randomly selects a monster with the given rarity.
  */
 function pickMonster(rarity) {
   const possibleMonsters = MONSTERS.filter(
@@ -466,19 +500,293 @@ function pickMonster(rarity) {
 }
 
 // ========================================
+// PHASE 2B - FAVORITES
+// ========================================
+
+/**
+ * Adds or removes a monster from favorites.
+ *
+ * includes() checks whether an ID is present.
+ * filter() creates an array without that ID.
+ * push() adds a new ID to the favorites array.
+ */
+function toggleFavorite(monsterId) {
+  if (!state.collection[monsterId]) return;
+
+  if (state.favorites.includes(monsterId)) {
+    state.favorites = state.favorites.filter(
+      id => id !== monsterId
+    );
+  } else {
+    state.favorites.push(monsterId);
+  }
+
+  saveGame();
+  renderCollection();
+
+  const monster = MONSTERS.find(
+    item => item.id === monsterId
+  );
+
+  if (monster && ui.detailsDialog.open) {
+    if (selectedMonsterId === monsterId) {
+      renderMonsterDetails(monster);
+    }
+  }
+}
+
+/**
+ * Creates a Favorite button for one monster.
+ *
+ * aria-pressed tells assistive technology
+ * whether the toggle is selected.
+ */
+function createFavoriteButton(monster) {
+  const button = document.createElement("button");
+  button.type = "button";
+
+  const isFavorite = state.favorites.includes(monster.id);
+
+  button.className = isFavorite
+    ? "favorite-button is-favorite"
+    : "favorite-button";
+
+  button.textContent = isFavorite
+    ? "★ Favorited"
+    : "☆ Favorite";
+
+  button.setAttribute("aria-pressed", String(isFavorite));
+  button.setAttribute(
+    "aria-label",
+    `${isFavorite ? "Remove" : "Add"} ${monster.name} ${isFavorite ? "from" : "to"} favorites`
+  );
+
+  // Clicking the button toggles its saved state.
+  button.addEventListener("click", () => {
+    toggleFavorite(monster.id);
+  });
+
+  return button;
+}
+
+// ========================================
+// PHASE 2B - MONSTER DETAILS
+// ========================================
+
+/**
+ * Creates a label and value row.
+ *
+ * We use textContent rather than inserting
+ * HTML strings, which keeps values as plain text.
+ */
+function createDetailRow(label, value) {
+  const row = document.createElement("div");
+  row.className = "details-row";
+
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+
+  const valueElement = document.createElement("strong");
+  valueElement.textContent = String(value);
+
+  row.append(labelElement, valueElement);
+  return row;
+}
+
+/**
+ * Builds the contents of the monster details popup.
+ */
+function renderMonsterDetails(monster) {
+  const progress = getTraining(monster.id);
+  const isMaxLevel = progress.level >= MAX_LEVEL;
+  const isFavorite = state.favorites.includes(monster.id);
+
+  ui.detailsTitle.textContent = monster.name;
+  ui.detailsBody.replaceChildren();
+
+  const hero = document.createElement("div");
+  hero.className = "details-hero";
+  hero.textContent = monster.emoji;
+
+  const stats = document.createElement("div");
+  stats.className = "details-stats";
+
+  stats.append(
+    createDetailRow("Rarity", monster.rarity),
+    createDetailRow("Owned", state.collection[monster.id] || 0),
+    createDetailRow("Level", `${progress.level} / ${MAX_LEVEL}`),
+    createDetailRow("Power", getMonsterPower(monster)),
+    createDetailRow("Favorite", isFavorite ? "★ Yes" : "No")
+  );
+
+  const xpBar = document.createElement("progress");
+  xpBar.className = "xp-bar details-xp";
+  xpBar.max = isMaxLevel ? 1 : xpToNextLevel(progress.level);
+  xpBar.value = isMaxLevel ? 1 : progress.xp;
+
+  xpBar.setAttribute(
+    "aria-label",
+    `${monster.name} experience`
+  );
+
+  const xpLabel = document.createElement("p");
+  xpLabel.className = "hint";
+  xpLabel.textContent = isMaxLevel
+    ? "⭐ Maximum level reached"
+    : `Experience: ${progress.xp} / ${xpToNextLevel(progress.level)} XP`;
+
+  ui.detailsBody.append(hero, stats, xpBar, xpLabel);
+}
+
+/**
+ * Opens a popup with information about
+ * a discovered monster.
+ *
+ * showModal() is part of the HTML dialog API.
+ */
+function openMonsterDetails(monsterId) {
+  if (!state.collection[monsterId]) return;
+
+  const monster = MONSTERS.find(
+    item => item.id === monsterId
+  );
+
+  if (!monster) return;
+
+  selectedMonsterId = monsterId;
+  renderMonsterDetails(monster);
+
+  if (!ui.detailsDialog.open) {
+    ui.detailsDialog.showModal();
+  }
+}
+
+/**
+ * Creates the Details button for a monster card.
+ */
+function createDetailsButton(monster) {
+  const button = document.createElement("button");
+
+  button.type = "button";
+  button.className = "details-button";
+  button.textContent = "Details";
+
+  button.setAttribute(
+    "aria-label",
+    `View details for ${monster.name}`
+  );
+
+  button.addEventListener("click", () => {
+    openMonsterDetails(monster.id);
+  });
+
+  return button;
+}
+
+// ========================================
+// PHASE 2B - FILTERING AND SORTING
+// ========================================
+
+/**
+ * Gets monsters matching the selected filters,
+ * then sorts them in the requested order.
+ *
+ * Undiscovered monsters remain visible in
+ * the default All Monsters view, but their
+ * rarities remain hidden until discovered.
+ */
+function getFilteredMonsters() {
+  const rarity = ui.rarityFilter.value;
+  const sortBy = ui.sortBy.value;
+  const favoritesOnly = ui.favoritesOnly.checked;
+
+  const filtered = MONSTERS.filter(monster => {
+    const owned = (state.collection[monster.id] || 0) > 0;
+
+    // A rarity filter shows discovered matches only.
+    if (rarity !== "all") {
+      if (!owned || monster.rarity !== rarity) {
+        return false;
+      }
+    }
+
+    // Favorites filter shows owned favorites only.
+    if (
+      favoritesOnly &&
+      (!owned || !state.favorites.includes(monster.id))
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // sort() compares two monsters at a time.
+  filtered.sort((a, b) => {
+    const originalOrder =
+      MONSTERS.indexOf(a) - MONSTERS.indexOf(b);
+
+    if (sortBy === "original") {
+      return originalOrder;
+    }
+
+    const ownedA = (state.collection[a.id] || 0) > 0;
+    const ownedB = (state.collection[b.id] || 0) > 0;
+
+    // Put locked monsters after discovered monsters.
+    if (ownedA !== ownedB) {
+      return ownedA ? -1 : 1;
+    }
+
+    // Keep locked monster identities hidden.
+    if (!ownedA && !ownedB) {
+      return originalOrder;
+    }
+
+    if (sortBy === "name") {
+      return a.name.localeCompare(b.name);
+    }
+
+    if (sortBy === "rarity") {
+      return (
+        RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    if (sortBy === "level") {
+      return (
+        getTraining(b.id).level - getTraining(a.id).level ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    if (sortBy === "power") {
+      return (
+        getMonsterPower(b) - getMonsterPower(a) ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    return originalOrder;
+  });
+
+  return filtered;
+}
+
+// ========================================
 // USER INTERFACE
 // ========================================
 
 /**
- * Changes the text beneath the hatching egg.
+ * Updates the message below the hatching station.
  */
 function setStatus(message) {
   ui.status.textContent = message;
 }
 
 /**
- * Builds a basic monster card.
- * This is also used in the latest hatch panel.
+ * Creates the standard monster card.
  */
 function createMonsterCard(monster, count) {
   const card = document.createElement("article");
@@ -500,13 +808,11 @@ function createMonsterCard(monster, count) {
   owned.textContent = `Owned: ${count}`;
 
   card.append(emoji, name, rarity, owned);
-
   return card;
 }
 
 /**
- * Builds a question-mark card for a monster
- * the player has not yet discovered.
+ * Creates a hidden card for an undiscovered monster.
  */
 function createLockedCard() {
   const card = document.createElement("article");
@@ -523,12 +829,12 @@ function createLockedCard() {
   description.textContent = "Not discovered yet";
 
   card.append(emoji, name, description);
-
   return card;
 }
 
 /**
- * Updates coins, hatch count and discoveries.
+ * Updates player statistics and the new
+ * collection completion progress bar.
  */
 function renderStats() {
   ui.coins.textContent = state.coins;
@@ -538,40 +844,64 @@ function renderStats() {
     monster => (state.collection[monster.id] || 0) > 0
   ).length;
 
-  ui.discovered.textContent =
-    `${discovered} / ${MONSTERS.length}`;
+  const total = MONSTERS.length;
+  const percent = Math.round((discovered / total) * 100);
+
+  ui.discovered.textContent = `${discovered} / ${total}`;
+
+  // NEW: Update collection progress.
+  ui.collectionProgress.max = total;
+  ui.collectionProgress.value = discovered;
+
+  ui.collectionProgressLabel.textContent =
+    `${discovered} / ${total} · ${percent}%`;
 }
 
 /**
- * Rebuilds the encyclopedia.
+ * Builds the encyclopedia using the selected
+ * filters and sorting options.
  *
- * NEW: Owned monsters now receive leveling
- * controls directly beneath their cards.
+ * Owned monsters receive Favorite, Details
+ * and Feeding controls.
  */
 function renderCollection() {
   ui.collection.replaceChildren();
 
-  for (const monster of MONSTERS) {
+  const visibleMonsters = getFilteredMonsters();
+
+  // NEW: Show an empty message when nothing matches.
+  ui.collectionEmpty.hidden = visibleMonsters.length > 0;
+
+  for (const monster of visibleMonsters) {
     const count = state.collection[monster.id] || 0;
 
-    if (count > 0) {
-      const card = createMonsterCard(monster, count);
-
-      // Add leveling controls only to discovered monsters.
-      card.append(createTrainingControls(monster));
-
-      ui.collection.append(card);
-    } else {
+    if (count === 0) {
       ui.collection.append(createLockedCard());
+      continue;
     }
+
+    const card = createMonsterCard(monster, count);
+
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+
+    actions.append(
+      createFavoriteButton(monster),
+      createDetailsButton(monster)
+    );
+
+    card.append(
+      actions,
+      createTrainingControls(monster)
+    );
+
+    ui.collection.append(card);
   }
 }
 
 /**
- * Updates the free-coin timer and all buttons.
- *
- * NEW: Feeding buttons become disabled when
- * coins are insufficient or hatching is active.
+ * Refreshes the free-coin countdown and
+ * feeding button availability.
  */
 function updateButtons() {
   const elapsed = Date.now() - state.lastClaim;
@@ -595,7 +925,7 @@ function updateButtons() {
   ui.moonBtn.disabled = isHatching;
   ui.resetBtn.disabled = isHatching;
 
-  // Check the existing feed buttons.
+  // Recheck the currently displayed feeding buttons.
   const feedButtons =
     ui.collection.querySelectorAll(".feed-button");
 
@@ -611,12 +941,12 @@ function updateButtons() {
 }
 
 // ========================================
-// EGG HATCHING
+// EGG HATCHING - EXISTING GAMEPLAY
 // ========================================
 
 /**
- * Purchases an egg, chooses a monster,
- * updates collection data and plays the animation.
+ * Spends coins, selects a monster, awards
+ * duplicate bonuses and begins the animation.
  */
 function startHatch(egg) {
   if (isHatching) return;
@@ -637,7 +967,7 @@ function startHatch(egg) {
   const isDuplicate = previousCount > 0;
 
   state.collection[monster.id] = previousCount + 1;
-  state.hatches += 1;
+  state.hatches++;
 
   const bonus = isDuplicate
     ? DUPLICATE_REWARDS[rarity]
@@ -645,8 +975,8 @@ function startHatch(egg) {
 
   state.coins += bonus;
 
-  // NEW: Fresh monsters begin at Level 1.
-  // Duplicates keep the species' existing level.
+  // New species start at Level 1.
+  // Duplicates keep their existing training data.
   if (!state.training[monster.id]) {
     state.training[monster.id] = {
       level: 1,
@@ -654,9 +984,7 @@ function startHatch(egg) {
     };
   }
 
-  // Save before the animation to protect progress.
   saveGame();
-
   isHatching = true;
 
   ui.egg.textContent = "🥚";
@@ -676,7 +1004,8 @@ function startHatch(egg) {
 }
 
 /**
- * Reveals the monster after the egg animation.
+ * Finishes the egg animation and displays
+ * the newly hatched monster.
  */
 function finishHatch(monster, isDuplicate, bonus) {
   isHatching = false;
@@ -709,15 +1038,26 @@ function finishHatch(monster, isDuplicate, bonus) {
   renderStats();
   renderCollection();
   updateButtons();
+
+  // Refresh an open details popup after hatching.
+  if (ui.detailsDialog.open && selectedMonsterId) {
+    const selected = MONSTERS.find(
+      item => item.id === selectedMonsterId
+    );
+
+    if (selected) {
+      renderMonsterDetails(selected);
+    }
+  }
 }
 
 // ========================================
-// FREE COINS
+// COIN COLLECTION
 // ========================================
 
 /**
- * Gives the player 25 coins if the
- * 12-second cooldown has finished.
+ * Awards 25 coins if the 12-second
+ * collection cooldown has finished.
  */
 function claimCoins() {
   const now = Date.now();
@@ -737,24 +1077,35 @@ function claimCoins() {
 }
 
 // ========================================
-// RESET PROGRESS
+// RESET GAME
 // ========================================
 
 /**
- * Resets coins, collection and training.
- * The player must confirm the reset first.
+ * Asks for confirmation before resetting
+ * coins, collection, training and favorites.
  */
 function resetProgress() {
   if (isHatching) return;
 
   const confirmed = window.confirm(
-    "Reset your coins, monsters, levels and XP?"
+    "Reset coins, monsters, levels and favorites?"
   );
 
   if (!confirmed) return;
 
   state = createFreshGame();
   saveGame();
+
+  // Reset all the collection view controls too.
+  ui.rarityFilter.value = "all";
+  ui.sortBy.value = "original";
+  ui.favoritesOnly.checked = false;
+
+  if (ui.detailsDialog.open) {
+    ui.detailsDialog.close();
+  }
+
+  selectedMonsterId = null;
 
   ui.egg.textContent = "🥚";
   ui.egg.classList.remove("revealed");
@@ -770,12 +1121,10 @@ function resetProgress() {
 }
 
 // ========================================
-// EVENT LISTENERS
+// BUTTON AND INPUT EVENT LISTENERS
 // ========================================
 
-// These connect the existing HTML buttons
-// to the corresponding JavaScript functions.
-
+// Existing egg purchase buttons.
 ui.meadowBtn.addEventListener("click", () => {
   startHatch(EGGS.meadow);
 });
@@ -784,17 +1133,37 @@ ui.moonBtn.addEventListener("click", () => {
   startHatch(EGGS.moon);
 });
 
+// Existing coin collection and reset buttons.
 ui.claimBtn.addEventListener("click", claimCoins);
 ui.resetBtn.addEventListener("click", resetProgress);
 
+// NEW: Filter and sorting dropdowns.
+// The change event runs after the player picks
+// a different option.
+ui.rarityFilter.addEventListener("change", renderCollection);
+ui.sortBy.addEventListener("change", renderCollection);
+
+// NEW: Toggle between all monsters and favorites.
+ui.favoritesOnly.addEventListener("change", renderCollection);
+
+// NEW: Close the monster information popup.
+ui.detailsClose.addEventListener("click", () => {
+  ui.detailsDialog.close();
+});
+
+// Clear the selected monster when the popup closes.
+ui.detailsDialog.addEventListener("close", () => {
+  selectedMonsterId = null;
+});
+
 // ========================================
-// START THE GAME
+// INITIALIZE THE GAME
 // ========================================
 
-// Load and display player progress.
+// Display saved coins, collection and levels.
 renderStats();
 renderCollection();
 updateButtons();
 
-// Update the free-coin cooldown once per second.
+// Refresh the coin cooldown once per second.
 window.setInterval(updateButtons, 1000);

@@ -437,3 +437,211 @@ footer {
   }
 }
 
+
+/* ======================================
+   PHASE 2B - COLLECTION IMPROVEMENTS
+   ====================================== */
+
+/* Collection completion area. */
+.collection-progress-section {
+  margin: 22px 0;
+}
+
+.progress-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.progress-heading strong {
+  color: #c4b5fd;
+}
+
+.collection-progress-bar {
+  width: 100%;
+  height: 18px;
+  accent-color: #a78bfa;
+}
+
+/* Filter and sorting toolbar. */
+.collection-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 15px;
+
+  background: #242844;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-field label {
+  color: #c4b5fd;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.filter-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  background: #171a32;
+  border: 1px solid #646b92;
+  border-radius: 9px;
+  color: white;
+  font: inherit;
+}
+
+.favorites-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.favorites-filter input {
+  width: 18px;
+  height: 18px;
+  accent-color: #facc15;
+}
+
+.empty-message {
+  padding: 25px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Ensures hidden messages stay hidden. */
+[hidden] {
+  display: none !important;
+}
+
+/* Favorite and details buttons in each card. */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.card-actions button {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 9px;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.favorite-button {
+  background: #30324c;
+  color: #fcd34d;
+  border: 1px solid #b8a05c;
+}
+
+.favorite-button.is-favorite {
+  background: #6b4b13;
+  border-color: #facc15;
+}
+
+.details-button {
+  background: #303b6a;
+  color: #dbeafe;
+  border: 1px solid #647bc0;
+}
+
+.card-actions button:hover {
+  filter: brightness(1.18);
+}
+
+/* Monster details popup. */
+.details-dialog {
+  width: min(460px, calc(100% - 32px));
+  max-height: 85vh;
+  overflow-y: auto;
+
+  padding: 24px;
+  background: #1b1e38;
+  border: 1px solid #8b5cf6;
+  border-radius: 18px;
+
+  color: #f5f3ff;
+  box-shadow: 0 20px 60px #0009;
+}
+
+.details-dialog::backdrop {
+  background: #050612bd;
+}
+
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.details-header h3 {
+  margin: 0;
+}
+
+.details-close {
+  min-width: 42px;
+  min-height: 42px;
+  border-radius: 9px;
+  border: 1px solid #666b8b;
+  background: #30334c;
+  color: white;
+}
+
+.details-hero {
+  font-size: 75px;
+  text-align: center;
+  padding: 15px;
+}
+
+.details-stats {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.details-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.details-row span {
+  color: var(--muted);
+}
+
+.details-row strong {
+  text-align: right;
+}
+
+.details-xp {
+  display: block;
+  margin-top: 20px;
+}
+
+/* Responsive toolbar layout. */
+@media (max-width: 760px) {
+  .collection-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
