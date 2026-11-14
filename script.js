@@ -306,6 +306,7 @@ const ui = {
 let state = loadGame();
 let isHatching = false;
 let isEvolving = false;
+let isBattling = false
 let selectedMonsterId = null;
 
 // Stores the achievements already recognized as unlocked.
@@ -327,6 +328,12 @@ let toastTimer = null;
  * Evolution progress is stored separately
  * so the original monster IDs never change.
  */
+
+/**
+ * Creates a fresh game with all progression systems.
+ *
+ * Phase 3A adds battleStats to track wins and losses.
+ */
 function createFreshGame() {
   return {
     coins: 200,
@@ -336,9 +343,17 @@ function createFreshGame() {
     evolutions: {},
     favorites: [],
     claimedAchievements: [],
+
+    // NEW: Permanent battle records.
+    battleStats: {
+      wins: 0,
+      losses: 0
+    },
+
     lastClaim: 0
   };
 }
+
 
 /**
  * Calculates the XP needed to reach the next level.
@@ -550,6 +565,24 @@ function loadGame() {
       claimedAchievements:
         sanitizeClaimedAchievements(saved.claimedAchievements),
 
+
+        // Phase 3A: Load valid battle records.
+        // Older saves without battleStats begin at 0 wins/losses.
+        battleStats: {
+        wins:
+        Number.isSafeInteger(saved.battleStats?.wins) &&
+        saved.battleStats.wins >= 0
+        ? saved.battleStats.wins
+        : 0,
+
+        losses:
+        Number.isSafeInteger(saved.battleStats?.losses) &&
+        saved.battleStats.losses >= 0
+        ? saved.battleStats.losses
+        : 0
+},
+
+
       lastClaim:
         Number.isFinite(saved.lastClaim) && saved.lastClaim >= 0
           ? saved.lastClaim
@@ -668,7 +701,7 @@ function getMonsterPower(monster) {
  * preventing progress loss if the page refreshes.
  */
 function evolveMonster(monsterId) {
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   const monster = MONSTERS.find(
     item => item.id === monsterId
@@ -822,7 +855,7 @@ function createEvolutionControls(monster) {
  */
 function feedMonster(monsterId) {
   // Do not process actions during another animation.
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   const monster = MONSTERS.find(
     item => item.id === monsterId
@@ -958,7 +991,7 @@ function createTrainingControls(monster) {
  * preventing progress loss if the page refreshes.
  */
 function evolveMonster(monsterId) {
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   const monster = MONSTERS.find(
     item => item.id === monsterId
@@ -1484,7 +1517,7 @@ function isAchievementUnlocked(achievement) {
  */
 function claimAchievement(achievementId) {
   // Do not process actions during another animation.
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   const achievement = ACHIEVEMENTS.find(
     item => item.id === achievementId
@@ -1849,7 +1882,7 @@ function renderCollection() {
  * while an egg is hatching or a monster evolves.
  */
 function updateButtons() {
-  const busy = isHatching || isEvolving;
+  const busy = isHatching || isEvolving || isBattling;
 
   const elapsed = Date.now() - state.lastClaim;
 
@@ -1885,6 +1918,10 @@ function updateButtons() {
       busy ||
       progress.level >= MAX_LEVEL ||
       state.coins < FEED_COST;
+
+      if (typeof updateBattleControls === "function") {
+  updateBattleControls();
+    }
   }
 
   // Achievement reward buttons.
@@ -1932,7 +1969,7 @@ function updateButtons() {
  */
 function startHatch(egg) {
   // Do not process actions during another animation.
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   if (state.coins < egg.cost) {
     setStatus("❌ Not enough coins! Gather more coins first.");
@@ -2018,6 +2055,7 @@ function finishHatch(monster, duplicate, bonus) {
 
   renderStats();
   renderCollection();
+  refreshBattleRoster();
 
   // NEW: Unlock achievements caused by this hatch.
   renderAchievements(true);
@@ -2066,7 +2104,7 @@ function claimCoins() {
  */
 function resetProgress() {
   // Do not process actions during another animation.
-  if (isHatching || isEvolving) return;
+  if (isHatching || isEvolving || isBattling) return;
 
   const confirmed = window.confirm(
     "Reset coins, monsters, levels, favorites and achievements?"
@@ -2109,6 +2147,9 @@ function resetProgress() {
   renderStats();
   renderCollection();
   renderAchievements();
+  activeBattle = null;
+  refreshBattleRoster();
+  renderBattle();
   updateButtons();
 }
 
