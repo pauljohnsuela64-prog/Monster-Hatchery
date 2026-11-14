@@ -14,6 +14,8 @@
 
   <!-- defer loads JavaScript after the HTML is ready. -->
   <script src="script.js" defer></script>
+  <!-- Battle logic loads after the main game. -->
+  <script src="battle.js" defer></script>
 </head>
 
 <body>
@@ -295,6 +297,95 @@
   aria-live="polite"
   hidden
 ></div>
+
+
+<!-- ======================================
+     PHASE 3A - MONSTER BATTLE ARENA
+     ====================================== -->
+
+<section class="panel battle-arena">
+  <div class="battle-heading">
+    <div>
+      <h2>⚔️ Monster Battle Arena</h2>
+      <p>Train your monsters and challenge wild opponents!</p>
+    </div>
+
+    <div class="battle-record">
+      <span>🏆 Wins: <strong id="battleWins">0</strong></span>
+      <span>💀 Losses: <strong id="battleLosses">0</strong></span>
+    </div>
+  </div>
+
+  <!-- Choose a monster from your collection. -->
+  <div class="battle-setup">
+    <label for="battleMonsterSelect">Choose your fighter</label>
+    <select id="battleMonsterSelect"></select>
+
+    <button id="battleStartBtn" type="button">
+      ⚔️ Start Battle
+    </button>
+  </div>
+
+  <!-- Both fighters and their health bars. -->
+  <div class="battle-fighters">
+    <article class="fighter-card">
+      <h3>Your Monster</h3>
+      <div id="battlePlayerName" class="fighter-name">—</div>
+
+      <progress
+        id="battlePlayerHp"
+        max="100"
+        value="0"
+        aria-label="Your monster's health"
+      ></progress>
+
+      <p id="battlePlayerHpText">HP: —</p>
+    </article>
+
+    <div class="battle-versus">VS</div>
+
+    <article class="fighter-card">
+      <h3>Wild Opponent</h3>
+      <div id="battleEnemyName" class="fighter-name">—</div>
+
+      <progress
+        id="battleEnemyHp"
+        max="100"
+        value="0"
+        aria-label="Enemy monster's health"
+      ></progress>
+
+      <p id="battleEnemyHpText">HP: —</p>
+    </article>
+  </div>
+
+  <!-- Player actions. -->
+  <div class="battle-actions">
+    <button id="battleAttackBtn" disabled>
+      ⚔️ Attack
+    </button>
+
+    <button id="battleDefendBtn" disabled>
+      🛡️ Defend
+    </button>
+
+    <button id="battleHealBtn" disabled>
+      💚 Heal
+    </button>
+  </div>
+
+  <p id="battleStatus" class="battle-status" role="status">
+    Select a discovered monster to begin.
+  </p>
+
+  <div class="battle-log">
+    <h3>📜 Battle Log</h3>
+    <div id="battleLog" aria-live="polite">
+      Your battle events will appear here.
+    </div>
+  </div>
+</section>
+
 
 
 
