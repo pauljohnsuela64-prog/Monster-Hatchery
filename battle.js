@@ -499,5 +499,7 @@ battleUI.healBtn.addEventListener("click", () => {
 // ========================================
 
 // Populate the roster and show saved win/loss records.
-refreshBattleRoster();
-renderBattle();
+if (state) {
+  refreshBattleRoster();
+  renderBattle();
+}

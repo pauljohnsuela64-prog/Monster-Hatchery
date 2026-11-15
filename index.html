@@ -19,6 +19,7 @@
 </head>
 
 <body>
+  <p id="saveStatus" class="container" role="alert" hidden></p>
   <main class="container">
 
     <!-- Game title and player statistics. -->
@@ -331,10 +332,6 @@
     <article class="fighter-card">
       <h3>Your Monster</h3>
       <div id="battlePlayerName" class="fighter-name">—</div>
-      <p id="battlePlayerType" class="battle-type">
-        Element: —
-      </p>
-      <article id="battleEnemyCard" class="fighter-card"></article>
 
       <progress
         id="battlePlayerHp"
@@ -351,10 +348,6 @@
     <article class="fighter-card">
       <h3>Wild Opponent</h3>
       <div id="battleEnemyName" class="fighter-name">—</div>
-      <p id="battleEnemyType" class="battle-type">
-      Element: —
-      </p>
-      <article id="battleEnemyCard" class="fighter-card"></article>
 
       <progress
         id="battleEnemyHp"
@@ -369,23 +362,18 @@
 
   <!-- Player actions. -->
   <div class="battle-actions">
-  <button id="battleAttackBtn" type="button" disabled>
-    ⚔️ Attack
-  </button>
+    <button id="battleAttackBtn" disabled>
+      ⚔️ Attack
+    </button>
 
-  <button id="battleDefendBtn" type="button" disabled>
-    🛡️ Defend
-  </button>
+    <button id="battleDefendBtn" disabled>
+      🛡️ Defend
+    </button>
 
-  <button id="battleHealBtn" type="button" disabled>
-    💚 Heal
-  </button>
-
-  <!-- New: Elemental special attack. -->
-  <button id="battleSpecialBtn" type="button" disabled>
-    ✨ Special
-  </button>
-</div>
+    <button id="battleHealBtn" disabled>
+      💚 Heal
+    </button>
+  </div>
 
   <p id="battleStatus" class="battle-status" role="status">
     Select a discovered monster to begin.
