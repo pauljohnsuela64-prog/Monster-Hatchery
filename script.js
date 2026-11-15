@@ -303,6 +303,8 @@ const ui = {
   evolutionClose: document.getElementById("evolutionClose")
 };
 
+let savedTextAtLoad = null;
+let saveBlocked = false;
 let state = loadGame();
 let isHatching = false;
 let isEvolving = false;
@@ -503,22 +505,43 @@ function sanitizeClaimedAchievements(savedClaims) {
   )];
 }
 
-/**
- * Loads existing game progress.
- *
- * The additional claimedAchievements property
- * is optional for older saved games.
- */
+function showSaveError(message, pause = false) {
+  const notice = document.getElementById("saveStatus");
+  notice.textContent = message;
+  notice.hidden = false;
+  if (pause) {
+    saveBlocked = true;
+    document.querySelector("main").inert = true;
+  }
+}
+
+// Missing optional fields are compatible; never silently discard existing data.
+function preservesSavedValues(saved, loaded) {
+  if (saved === null || typeof saved !== "object") return saved === loaded;
+  if (!loaded || typeof loaded !== "object" ||
+      Array.isArray(saved) !== Array.isArray(loaded)) return false;
+  if (Array.isArray(saved) && saved.length !== loaded.length) return false;
+  return Object.keys(saved).every(key =>
+    Object.hasOwn(loaded, key) && preservesSavedValues(saved[key], loaded[key])
+  );
+}
+
+// Older saves may omit progression fields added after their version.
 function loadGame() {
   try {
     const savedText = localStorage.getItem(STORAGE_KEY);
+    savedTextAtLoad = savedText;
 
-    if (!savedText) return createFreshGame();
+    if (savedText === null) return createFreshGame();
 
     const saved = JSON.parse(savedText);
 
-    if (!saved || typeof saved !== "object") {
-      return createFreshGame();
+    if (!saved || typeof saved !== "object" || Array.isArray(saved) ||
+        !Number.isSafeInteger(saved.coins) || saved.coins < 0 ||
+        !Number.isSafeInteger(saved.hatches) || saved.hatches < 0 ||
+        !saved.collection || typeof saved.collection !== "object" ||
+        Array.isArray(saved.collection)) {
+      throw new Error("Invalid save format");
     }
 
     const collection = {};
@@ -539,7 +562,7 @@ function loadGame() {
     // validate the saved evolution stages.
     const training = sanitizeTraining(saved.training, collection);
 
-    return {
+    const loaded = {
       coins:
         Number.isSafeInteger(saved.coins) && saved.coins >= 0
           ? saved.coins
@@ -588,9 +611,18 @@ function loadGame() {
           ? saved.lastClaim
           : 0
     };
+    if (!preservesSavedValues(saved, loaded)) {
+      throw new Error("Save contains invalid or unsupported progress");
+    }
+    return loaded;
   } catch (error) {
     console.warn("Could not load saved game:", error);
-    return createFreshGame();
+    showSaveError(
+      "Your saved progress could not be loaded. Play is paused to protect it. " +
+      "Nothing has been overwritten. Keep this browser and address, back up the save " +
+      "using the README instructions, and check browser storage permissions before reloading.", true
+    );
+    return null;
   }
 }
 
@@ -598,13 +630,31 @@ function loadGame() {
  * Saves every part of the game in browser storage.
  */
 function saveGame() {
+  if (saveBlocked || !state) return false;
   try {
+    if (localStorage.getItem(STORAGE_KEY) !== savedTextAtLoad) {
+      showSaveError(
+        "The saved game changed in another tab or was removed. This tab cannot save. " +
+        "Reload to use the current save. Existing stored progress was not overwritten.", true
+      );
+      return false;
+    }
+    const text = JSON.stringify(state);
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(state)
+      text
     );
+    savedTextAtLoad = text;
+    document.getElementById("saveStatus").hidden = true;
+    return true;
   } catch (error) {
     console.warn("Could not save game:", error);
+    showSaveError(
+      "Progress could not be saved. New progress is only in this tab. " +
+      "Keep it open, check browser storage permissions and free space, then try an action again. " +
+      "Your previous stored save has not been replaced."
+    );
+    return false;
   }
 }
 
@@ -2202,12 +2252,14 @@ ui.detailsDialog.addEventListener("close", () => {
 // ========================================
 
 // Render the saved game.
-renderStats();
-renderCollection();
+if (state) {
+  renderStats();
+  renderCollection();
 
-// NEW: Recognize existing achievements silently.
-renderAchievements();
+  // Recognize existing achievements silently.
+  renderAchievements();
 
-// Enable controls and start the cooldown timer.
-updateButtons();
-window.setInterval(updateButtons, 1000);
+  // Enable controls and start the cooldown timer.
+  updateButtons();
+  window.setInterval(updateButtons, 1000);
+}
